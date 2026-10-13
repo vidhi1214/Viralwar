@@ -39,3 +39,22 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# java & maven
+target/
+**/target/
+*.jar
+*.war
+*.class
+.mvn/wrapper/maven-wrapper.jar
+*.log
+
+# editors & ai tooling
+.vscode/
+.idea/
+.cursor/
+.claude/
+.devin/
+.agents/
+.prisma/
+

@@ -9,13 +9,18 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@react-three/drei": "^10.7.9",
+    "@react-three/fiber": "^9.8.1",
     "bcryptjs": "^3.0.3",
+    "clsx": "^2.1.1",
+    "cs": "^1.0.3",
     "jsonwebtoken": "^9.0.3",
     "next": "16.3.6",
     "pg": "^8.23.0",
     "prisma": "^8.0.0-rc.17",
     "react": "19.2.8",
-    "react-dom": "19.2.8"
+    "react-dom": "19.2.8",
+    "three": "^0.186.1"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",

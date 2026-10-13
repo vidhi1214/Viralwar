@@ -1,0 +1,343 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  CREATOR
+  BRAND
+  ADMIN
+}
+
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+  DEACTIVATED
+}
+
+enum CampaignStatus {
+  DRAFT
+  REVIEW
+  SCHEDULED
+  ACTIVE
+  PAUSED
+  ENDED
+  SETTLING
+  COMPLETED
+  CANCELLED
+}
+
+enum CampaignMetricMetric {
+  VIEWS
+  LIKES
+  COMMENTS
+  SHARES
+  SAVES
+  WATCH_TIME
+  CLICKS
+  CONVERSIONS
+  REVENUE
+}
+
+enum CampaignMetricCapType {
+  NONE
+  ABSOLUTE
+  PERCENTAGE
+}
+
+enum FraudSignalStatus {
+  CLEAR
+  REVIEW
+  RESTRICTED
+  CONFIRMED
+}
+
+enum RewardStatus {
+  CALCULATING
+  PENDING_REVIEW
+  APPROVED
+  PROCESSING
+  PAID
+  FAILED
+  DISPUTED
+}
+
+enum AttributionStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+}
+
+model User {
+  id            String    @id @default(uuid())
+  email         String    @unique
+  password      String
+  role          UserRole  @default(CREATOR)
+  status        UserStatus @default(ACTIVE)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  creatorProfile CreatorProfile? @relation(fields: [userId], references: [id])
+  brand          Brand?    @relation(fields: [userId], references: [id])
+}
+
+model CreatorProfile {
+  id             String    @id @default(uuid())
+  userId         String    @unique
+  username       String
+  displayName    String
+  bio            String?
+  avatar         String?
+  categories     String[]  @default([])
+  languages      String[]  @default([])
+  location       String?
+  followerCount  Int       @default(0)
+  verifiedStatus Boolean   @default(false)
+  reputationScore Float      @default(0.0)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  user           User      @relation(fields: [userId], references: [id])
+  socialAccounts SocialAccount[]
+  submissions    Submission[]
+}
+
+model Brand {
+  id            String    @id @default(uuid())
+  name          String
+  slug          String    @unique
+  logo          String?
+  description   String?
+  website       String?
+  verificationStatus Boolean @default(false)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  organizationMemberships OrganizationMembership[]
+  campaigns      Campaign[]
+}
+
+model OrganizationMembership {
+  id          String    @id @default(uuid())
+  organizationId String  @unique
+  userId      String
+  role        String    @default("OWNER")
+  createdAt   DateTime  @default(now())
+
+  organization Brand @relation(fields: [organizationId], references: [id])
+  user         User      @relation(fields: [userId], references: [id])
+}
+
+model Campaign {
+  id               String        @id @default(uuid())
+  brandId          String
+  title            String
+  slug             String        @unique
+  description      String
+  product          String
+  objective        String
+  status           CampaignStatus @default(DRAFT)
+  startAt          DateTime
+  endAt            DateTime
+  budget           Float
+  prizePool        Float
+  currency         String        @default("INR")
+  rules            Json?
+  eligibility      Json?
+  platforms        String[]      @default([])
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+
+  brand            Brand         @relation(fields: [brandId], references: [id])
+  campaignParticipants CampaignParticipant[]
+  submissions      Submission[]
+  aiInsights       AIInsight[]
+  fraudSignals     FraudSignal[]
+}
+
+model CampaignParticipant {
+  id           String    @id @default(uuid())
+  campaignId   String
+  creatorId    String
+  joinedAt     DateTime  @default(now())
+  status       String    @default("ACTIVE")
+
+  campaign  Campaign  @relation(fields: [campaignId], references: [id])
+  creator   CreatorProfile @relation(fields: [creatorId], references: [id])
+}
+
+model CampaignMetricConfig {
+  id               String    @id @default(uuid())
+  campaignId       String
+  metric           CampaignMetricMetric
+  weight           Float
+  capType          CampaignMetricCapType @default(NONE)
+  capValue         Float?
+  minimumThreshold Float?
+  maximumThreshold Float?
+
+  campaign Campaign @relation(fields: [campaignId], references: [id])
+
+  @@ unique(campaignId, metric)
+}
+
+model Submission {
+  id               String    @id @default(uuid())
+  campaignId       String
+  creatorId        String
+  platform         String
+  contentUrl       String
+  caption          String?
+  submittedAt      DateTime  @default(now())
+  status           String    @default("PENDING")
+  moderationStatus String    @default("PENDING")
+
+  campaign Campaign @relation(fields: [campaignId], references: [id])
+  creator  CreatorProfile @relation(fields: [creatorId], references: [id])
+  metrics  ContentMetricSnapshot[]
+}
+
+model ContentMetricSnapshot {
+  id            String    @id @default(uuid())
+  submissionId  String
+  capturedAt    DateTime  @default(now())
+  views         Int        @default(0)
+  likes         Int        @default(0)
+  comments      Int        @default(0)
+  shares        Int        @default(0)
+  saves         Int        @default(0)
+  watchTime     Float      @default(0.0)
+  clicks        Int        @default(0)
+  conversions   Int        @default(0)
+  revenue       Float      @default(0.0)
+
+  submission Submission @relation(fields: [submissionId], references: [id])
+
+  @@ unique(submissionId, capturedAt)
+}
+
+model LeaderboardEntry {
+  id            String    @id @default(uuid())
+  campaignId    String
+  creatorId     String
+  score         Float
+  views         Int
+  engagement    Int
+  conversions   Int
+  rank          Int
+  trend         Float      @default(0.0)
+  movement      String     @default("NONE")
+  capturedAt    DateTime  @default(now())
+
+  campaign Campaign @relation(fields: [campaignId], references: [id])
+  creator  CreatorProfile @relation(fields: [creatorId], references: [id])
+
+  @@ unique(campaignId, creatorId)
+}
+
+model Reward {
+  id             String    @id @default(uuid())
+  campaignId     String
+  creatorId      String
+  amount         Float
+  currency       String    @default("INR")
+  reason         String
+  status         RewardStatus @default(CALCULATING)
+  calculatedAt   DateTime  @default(now())
+  paidAt         DateTime?
+
+  campaign Campaign @relation(fields: [campaignId], references: [id])
+  creator  CreatorProfile @relation(fields: [creatorId], references: [id])
+}
+
+model Payout {
+  id              String    @id @default(uuid())
+  rewardId        String
+  provider        String
+  providerReference String?
+  status          String    @default("PENDING")
+  amount          Float
+  currency        String    @default("INR")
+  failureReason   String?
+  failureAt       DateTime?
+  processedAt     DateTime?
+
+  reward Reward @relation(fields: [rewardId], references: [id])
+}
+
+model SocialAccount {
+  id             String    @id @default(uuid())
+  creatorId      String
+  platform       String
+  externalAccountId String
+  accessToken    String    @sensitive
+  refreshToken   String    @sensitive
+  tokenExpiry    DateTime
+  scopes         String[]  @default([])
+  connectedAt    DateTime  @default(now())
+
+  creator CreatorProfile @relation(fields: [creatorId], references: [id])
+}
+
+model AttributionEvent {
+  id            String    @id @default(uuid())
+  campaignId    String
+  creatorId     String
+  submissionId  String?
+  clickId       String?
+  conversionId  String?
+  click         Boolean
+  conversion    Boolean
+  order         String?
+  revenue       Float
+  timestamp     DateTime  @default(now())
+  status        AttributionStatus @default(PENDING)
+  idempotencyKey String  @unique
+
+  campaign Campaign @relation(fields: [campaignId], references: [id])
+  creator  CreatorProfile @relation(fields: [creatorId], references: [id])
+  submission Submission @relation(fields: [submissionId], references: [id])
+}
+
+model AIInsight {
+  id             String    @id @default(uuid())
+  campaignId     String
+  insightType    String
+  summary        String
+  confidence     Float
+  evidence       Json?
+  generatedAt    DateTime  @default(now())
+
+  campaign Campaign @relation(fields: [campaignId], references: [id])
+}
+
+model FraudSignal {
+  id             String    @id @default(uuid())
+  creatorId      String
+  submissionId   String?
+  campaignId     String
+  signalType     String
+  severity       Float
+  evidence       Json
+  status         FraudSignalStatus @default(CLEAR)
+
+  creator CreatorProfile @relation(fields: [creatorId], references: [id])
+  submission Submission @relation(fields: [submissionId], references: [id])
+  campaign Campaign @relation(fields: [campaignId], references: [id])
+}
+
+model AuditLog {
+  id             String    @id @default(uuid())
+  actorId        String
+  action         String
+  entityType     String
+  entityId       String
+  metadata       Json?
+  createdAt      DateTime  @default(now())
+
+  actor User @relation(fields: [actorId], references: [id])
+}
